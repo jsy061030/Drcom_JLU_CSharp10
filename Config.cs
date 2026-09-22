@@ -110,7 +110,7 @@ public sealed class Config
         return value;
     }
 
-    private void Validate()
+    internal void Validate()
     {
         if (Server.Length == 0) throw new IOException("config: 'server' is required");
         if (Username.Length == 0) throw new IOException("config: 'username' is required");

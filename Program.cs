@@ -4,7 +4,8 @@ using DrcomClient;
 //
 // 配置文件查找顺序：
 //   1. 命令行第一个参数指定的路径；
-//   2. 否则使用可执行文件所在目录下的 drcom.toml。
+//   2. 可执行文件所在目录下的 drcom.toml；
+//   3. 用户主目录下的 ~/.drcomconfig（Rust/WebUI 写出的 JSON 格式）。
 
 const string SampleConfig = """
 server = "10.100.61.3"
@@ -22,22 +23,27 @@ mac = "AA:BB:CC:DD:EE:FF"
 """;
 
 string[] cliArgs = Environment.GetCommandLineArgs()[1..];
-string configPath = cliArgs.Length >= 1
-    ? cliArgs[0]
-    : Path.Combine(AppContext.BaseDirectory, "drcom.toml");
 
-if (!File.Exists(configPath))
-{
-    Console.Error.WriteLine($"config file not found: {configPath}");
-    Console.Error.WriteLine("sample config:");
-    Console.Error.WriteLine(SampleConfig);
-    return 1;
-}
+Config? config = null;
+string? configSource = null;
 
-Config config;
 try
 {
-    config = Config.FromFile(configPath);
+    if (cliArgs.Length >= 1)
+    {
+        configSource = cliArgs[0];
+        config = Config.FromFile(configSource);
+    }
+    else if (File.Exists(Path.Combine(AppContext.BaseDirectory, "drcom.toml")))
+    {
+        configSource = Path.Combine(AppContext.BaseDirectory, "drcom.toml");
+        config = Config.FromFile(configSource);
+    }
+    else
+    {
+        configSource = DrcomConfigStore.ConfigPath;
+        config = DrcomConfigStore.TryLoad();
+    }
 }
 catch (Exception ex)
 {
@@ -45,6 +51,15 @@ catch (Exception ex)
     return 1;
 }
 
+if (config is null)
+{
+    Console.Error.WriteLine($"config file not found: {configSource}");
+    Console.Error.WriteLine("sample config:");
+    Console.Error.WriteLine(SampleConfig);
+    return 1;
+}
+
+Console.WriteLine($"loaded config: {configSource}");
 Console.WriteLine($"auth svr: {config.Server}");
 Console.WriteLine($"username: {config.Username}");
 Console.WriteLine($"mac: {config.Mac}");
